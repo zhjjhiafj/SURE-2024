@@ -1,4 +1,4 @@
-# The plot of example 1 with n=1, L=1, a_0=1 in Bueler's document
+# The plot of example 1 with n=1, L=1, a_0=1,lambda=1 in Bueler's document
 from fenics import *
 import numpy as np
 import matplotlib.pyplot as plt
