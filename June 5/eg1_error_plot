@@ -17,17 +17,16 @@ def error(n):
     # Define variational problem
     u = Function(V)
     v = TestFunction(V)
-    f = Constant(1.0)
-    F = (1/3) * u**3 * dot(grad(u), grad(v)) * dx - f * v * dx
+    f = Constant(1)
+    F = (1.0/3.0) * u**3.0 * dot(grad(u), grad(v)) * dx - f * v * dx
     # Interpolate initial guess
     u.interpolate(Constant(0.5))
     # Solve nonlinear variational problem
     solve(F == 0, u, bc)
     # Define expression for exact solution
-    b = Expression('pow(6, 1/4) * pow(1 - pow(abs(x[0]), 2), 1/4)', degree=1)
-    b_ = interpolate(b, V)
+    b = Expression('pow(6.0, 1.0/4.0) * pow(1 - pow(abs(x[0]), 2.0), 1.0/4.0)', degree=1)
     # Compute and return L2 error
-    err = errornorm(b_, u, 'L2')
+    err = errornorm(b, u, 'L2')
     return err
 
 
