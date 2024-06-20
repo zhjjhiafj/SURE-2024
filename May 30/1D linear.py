@@ -25,7 +25,7 @@ L = f * v * dx
 u = Function(V)
 solve(a == L, u, bc)
 
-# Define the function for Dirichlet boundary condition
+# Define the function for the Exact Solution
 def u_D(x):
     return -0.5 * x**2 + 0.5 * x
 
