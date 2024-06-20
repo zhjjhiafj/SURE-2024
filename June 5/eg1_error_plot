@@ -1,1 +1,55 @@
+#The resolution-error plot of example 1
+from fenics import *
+import numpy as np
+import matplotlib.pyplot as plt
 
+
+# Define function to compute L2 error 
+def error(n):
+    # Define mesh and function space
+    mesh = IntervalMesh(n, -1, 1)
+    V = FunctionSpace(mesh, 'P', 1)
+    # Define boundary condition
+    u_e = Constant(0.0)
+    def boundary(x, on_boundary):
+        return on_boundary
+    bc = DirichletBC(V, u_e, boundary)
+    # Define variational problem
+    u = Function(V)
+    v = TestFunction(V)
+    f = Constant(1.0)
+    F = (1/3) * u**3 * dot(grad(u), grad(v)) * dx - f * v * dx
+    # Interpolate initial guess
+    u.interpolate(Constant(0.5))
+    # Solve nonlinear variational problem
+    solve(F == 0, u, bc)
+    # Define expression for exact solution
+    b = Expression('pow(6, 1/4) * pow(1 - pow(abs(x[0]), 2), 1/4)', degree=1)
+    b_ = interpolate(b, V)
+    # Compute and return L2 error
+    err = errornorm(b_, u, 'L2')
+    return err
+
+
+import matplotlib.pyplot as plt
+
+# Define the range of the size of mesh
+n = range(100, 1000) 
+
+# x=1/n resolution 
+x = [1/i for i in n]
+# y error
+y = [error(i) for i in n]
+
+# Create the plot
+plt.figure(figsize=(10, 6))
+plt.plot(x, y, 'ro-', markersize=8)
+
+# Add labels and title
+plt.xlabel('Mesh Resolution')
+plt.ylabel('Error')
+plt.legend()
+plt.grid(True)
+
+# Display the plot
+plt.show()
