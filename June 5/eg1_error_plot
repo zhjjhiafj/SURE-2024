@@ -24,8 +24,8 @@ def error(n):
     # Solve nonlinear variational problem
     solve(F == 0, u, bc)
     # Define expression for exact solution
-    #b = Expression('pow(6.0, 1.0/4.0) * pow(1 - pow(x[0], 2.0), 1.0/4.0)', degree=1)
-    b = Expression('pow(6.0, 1.0/4.0) * pow(1 - pow(abs(x[0]), 2.0), 1.0/4.0)', degree=1)
+    b = Expression('pow(6.0, 1.0/4.0) * pow(1 - pow(x[0], 2.0), 1.0/4.0)', degree=1)
+    #b = Expression('pow(6.0, 1.0/4.0) * pow(1 - pow(abs(x[0]), 2.0), 1.0/4.0)', degree=1)
     # Compute and return L2 error
     err = errornorm(b, u, 'L2')
     return err
