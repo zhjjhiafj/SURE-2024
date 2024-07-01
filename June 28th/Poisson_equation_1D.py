@@ -1,4 +1,4 @@
-#Modified from example from tutorial： Poisson equation 1D
+#Modified from the example in tutorial： Poisson equation 1D
 
 from mpi4py import MPI
 from dolfinx import mesh
