@@ -101,6 +101,8 @@ ax.set_yscale('log')
 plt.xlabel("Iterations")
 plt.ylabel(r"$\vert\vert \delta u\vert\vert$")
 plt.grid()
+import matplotlib.pyplot as plt
+plt.show()
 
 error_max = domain.comm.allreduce(np.max(np.abs(uh.x.array - u_D.x.array)), op=MPI.MAX)
 if domain.comm.rank == 0:
