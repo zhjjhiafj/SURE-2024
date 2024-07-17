@@ -9,7 +9,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 n=1.1
 def q(u):
-    return 1/ (n + 2.0) * ((ufl.dot(ufl.grad(u), ufl.grad(u))) ** 2) ** ((n - 1.0) / 2.0)
+    return ((2.0**n*(n+2.0))**(1.0/(2.0*n+2.0)))*(1.0-((x_values**2)**0.5)**(1.0+1.0/n))**(n*1.0/(2.0*n+2.0))
 num_intervals = 2000
 start_point = -1.0
 end_point = 1.0
