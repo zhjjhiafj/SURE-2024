@@ -1,4 +1,4 @@
-#custom newton for n=3
+#custom newton for n=3 by change of variable
 import dolfinx.fem.petsc
 import matplotlib.pyplot as plt
 from dolfinx import mesh, fem, io, nls, log
