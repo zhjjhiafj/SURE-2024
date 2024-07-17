@@ -1,3 +1,4 @@
+#fixed point iteration for b=0,n=3
 import ufl
 import numpy
 import matplotlib.pyplot as plt
@@ -7,8 +8,8 @@ from dolfinx import mesh, fem, io, nls, log
 from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx.nls.petsc import NewtonSolver
 import numpy as np
-n=0.8
-num_intervals = 100
+n=3
+num_intervals = 1000
 start_point = -1.0
 end_point = 1.0
 domain = mesh.create_interval(MPI.COMM_WORLD, num_intervals, [start_point, end_point])
@@ -35,17 +36,19 @@ bc = fem.dirichletbc(u_D, fem.locate_dofs_topological(V, fdim, boundary_facets))
 
 error = float('inf')  # Use infinity as an initial error to ensure the loop starts
 tolerance = 1e-5  # Define a tolerance level
-max_iterations = 1  # Optional: to prevent infinite loops
+max_iterations = 100 # Optional: to prevent infinite loops
 iteration = 0
 uh = fem.Function(V)
 #b = fem.Constant(domain, default_scalar_type(1.0))
-b=1-x[0]**2
+#b=1-x[0]**2
+import math
+b=fem.Constant(domain, default_scalar_type(0.0))
 #uh.interpolate(lambda x: 2.0* (n + 2.0) ** (1.0 / n) * (1.0 - abs(x[0]) ** (1.0 + 1.0 / n)))
 while error > tolerance and iteration < max_iterations:
     uh2 = fem.Function(V)
-    uh2.interpolate(lambda x:1-x[0]**2)
+    uh2.interpolate(lambda x:1-0.5*x[0]**2)
     v = ufl.TestFunction(V)
-    Phi = -(2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * (ufl.grad(b)*0)
+    Phi = -(2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * (ufl.grad(b))
     a = (ufl.dot(ufl.grad(uh2) - Phi, ufl.grad(uh2) - Phi)) ** ((n - 1.0) / 2.0)
     # a = pow(ufl.dot(ufl.grad(uh2) - (2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * ufl.grad(b)\
     # , ufl.grad(uh2)
@@ -88,7 +91,6 @@ while error > tolerance and iteration < max_iterations:
 V_ex = fem.functionspace(domain, ("Lagrange", 2))
 u_ex = fem.Function(V_ex)
 # u_ex.interpolate(u_exact)
-print(uh.x.array)
 u_values = uh.x.array**(n/(2*n+2.0))
 x_values = np.linspace(start_point, end_point, num_intervals + 1)
 
@@ -97,7 +99,7 @@ if domain.comm.rank == 0:
     plt.figure()
     plt.grid()
     plt.plot(x_values, u_values, label="Numerical solution")
-    plt.plot(x_values, (2 * (n + 2) ** (1.0 / n) * (1 - abs(x_values) ** (1.0 + 1.0 / n))) ** (n / (2 * n + 2.0)), \
+    plt.plot(x_values, (2 * (n + 2) ** (1.0 / n) * (1 - abs(x_values) ** (1.0 + 1.0 / n))) ** (n / (2 * n + 2.0)),
              label="Exact solution",
              linestyle='dashed')
     plt.xlabel("x")
