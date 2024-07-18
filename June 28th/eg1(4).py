@@ -11,7 +11,7 @@ from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx.nls.petsc import NewtonSolver
 n=2.2
 def q(u):
-    return (((n/(2.0*n+2.0))**n) / (n + 2.0)) * (abs(ufl.dot(ufl.grad(u), ufl.grad(u)))) ** (n - 1.0)
+    return (((n/(2.0*n+2.0))**n) / (n + 2.0)) * (abs(ufl.dot(ufl.grad(u), ufl.grad(u)))) ** ((n - 1.0)/2)
 
 num_intervals = 1000
 start_point = -1.0
