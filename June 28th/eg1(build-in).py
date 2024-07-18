@@ -1,4 +1,4 @@
-#eg_1 build in solver
+#eg_1 build-in solver
 import dolfinx.fem.petsc
 import matplotlib.pyplot as plt
 from dolfinx import mesh, fem, io, nls, log
