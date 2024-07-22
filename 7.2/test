@@ -1,0 +1,140 @@
+# Import required libraries
+import matplotlib.pyplot as plt
+import numpy as np
+
+import dolfinx
+import dolfinx.plot
+import dolfinx.io
+import ufl
+from dolfinx import mesh, fem, io, nls, log
+from mpi4py import MPI
+from petsc4py import PETSc
+from dolfinx.cpp.mesh import CellType, DiagonalType
+
+import pyvista
+from pyvista.utilities.xvfb import start_xvfb
+start_xvfb(wait=0.5)
+# Define the dimensions of the rectangle
+L = 1.0  # Length
+H = 0.2  # Height
+
+# Create a rectangular mesh
+domain = mesh.create_rectangle(
+    MPI.COMM_WORLD,
+    [[0.0, 0.0], [L, H]],  # List of lists
+    [100, 15],  # Number of elements in each direction
+    cell_type=CellType.triangle,  # Use triangle cells
+    diagonal=DiagonalType.left  # Specify the diagonal type
+)
+
+
+with dolfinx.io.XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "w") as f:
+    f.write_mesh(domain)
+V = fem.FunctionSpace(domain, ("CG", 1))
+
+zero = fem.Function(V)
+with zero.vector.localForm() as loc:
+    loc.set(0.0)
+
+one = fem.Function(V)
+with one.vector.localForm() as loc:
+    loc.set(1.0)
+
+
+def left(x):
+    is_close = np.isclose(x[0], 0.0)
+    return is_close
+
+
+def right(x):
+    is_close = np.isclose(x[0], L)
+    return is_close
+
+
+left_facets = dolfinx.mesh.locate_entities_boundary(domain, domain.topology.dim - 1, left)
+left_dofs = dolfinx.fem.locate_dofs_topological(V, domain.topology.dim - 1, left_facets)
+
+right_facets = dolfinx.mesh.locate_entities_boundary(domain, domain.topology.dim - 1, left)
+right_dofs = dolfinx.fem.locate_dofs_topological(V, domain.topology.dim - 1, right_facets)
+
+bcs = [dolfinx.DirichletBC(zero, left_dofs), dolfinx.DirichletBC(one, right_dofs)]
+u = dolfinx.Function(V)
+
+ell = 0.3
+
+def w(alpha):
+    return alpha
+
+functional = (ell * ufl.inner(ufl.grad(u), ufl.grad(u)) + w(u)/ell)*ufl.dx
+
+dfunctional = ufl.derivative(functional, u, ufl.TestFunction(V))
+
+ddfunctional = ufl.derivative(dfunctional, u, ufl.TrialFunction(V))
+
+import sys
+sys.path.append("../python/")
+from snes_problem import SNESProblem
+
+snes_problem = SNESProblem(dfunctional, ddfunctional, u, bcs)
+
+b = dolfinx.cpp.la.create_vector(V.dofmap.index_map, V.dofmap.index_map_bs)
+J = dolfinx.fem.create_matrix(snes_problem.a)
+
+# Create Newton solver and solve
+solver_snes = PETSc.SNES().create()
+solver_snes.setType("vinewtonrsls")
+solver_snes.setFunction(snes_problem.F, b)
+solver_snes.setJacobian(snes_problem.J, J)
+solver_snes.setTolerances(rtol=1.0e-9, max_it=50)
+solver_snes.getKSP().setType("preonly")
+solver_snes.getKSP().setTolerances(rtol=1.0e-9)
+solver_snes.getKSP().getPC().setType("lu")
+
+# We set the bound (Note: they are passed as reference and not as values)
+solver_snes.setVariableBounds(zero.vector,one.vector)
+
+solver_snes.solve(None, u.vector)
+
+from pathlib import Path
+Path("output").mkdir(parents=True, exist_ok=True)
+
+with dolfinx.io.XDMFFile(MPI.COMM_WORLD, "output/u.xdmf", "w") as f:
+    f.write_mesh(domain)
+    f.write_function(u)
+
+import dolfinx.plot
+topology, cell_types = dolfinx.plot.create_vtk_topology(domain, domain.topology.dim)
+import pyvista
+grid = pyvista.UnstructuredGrid(topology, cell_types, domain.geometry.x)
+
+grid.point_arrays["alpha"] = u.compute_point_values().real
+grid.set_active_scalars("alpha")
+
+if pyvista.OFF_SCREEN:
+    from pyvista.utilities.xvfb import start_xvfb
+    start_xvfb(wait=0.1)
+
+plotter = pyvista.Plotter()
+plotter.add_mesh(grid, show_edges=False, show_scalar_bar=True)
+plotter.view_xy()
+if not pyvista.OFF_SCREEN:
+    plotter.show()
+figure = plotter.screenshot("output/u.png")
+
+from utils import evaluate_on_points
+
+points = np.zeros((3, 101))
+points[0] = np.linspace(0., 1., 101)
+points[1] = .1
+
+points_on_proc, u_values = evaluate_on_points(u, points)
+
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+plt.plot(points_on_proc[:, 0], u_values, "b--", linewidth = 2)
+plt.grid(True)
+plt.xlabel("x")
+plt.ylabel("u")
+# If run in parallel as a python file, we save a plot per processor
+plt.savefig(f"output/membrane_rank{MPI.COMM_WORLD.rank:d}.png")
