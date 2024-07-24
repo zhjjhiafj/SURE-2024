@@ -1,0 +1,42 @@
+import numpy as np
+
+import ufl
+from dolfinx import cpp as _cpp
+from dolfinx import la
+from dolfinx.fem import (Function, FunctionSpace, dirichletbc, form,
+                         locate_dofs_geometrical)
+from dolfinx.fem.petsc import (apply_lifting, assemble_matrix, assemble_vector,
+                               create_matrix, create_vector, set_bc)
+from dolfinx.mesh import create_unit_square
+from ufl import TestFunction, TrialFunction, derivative, dx, grad, inner
+
+from mpi4py import MPI
+from petsc4py import PETSc
+class SNESProblem:
+    def __init__(self, F, u, bc):
+        V = u.function_space
+        du = TrialFunction(V)
+        self.L = form(F)
+        self.a = form(derivative(F, u, du))
+        self.bc = bc
+        self._F, self._J = None, None
+        self.u = u
+
+    def F(self, snes, x, F):
+        """Assemble residual vector."""
+        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+        x.copy(self.u.vector)
+        self.u.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+
+        with F.localForm() as f_local:
+            f_local.set(0.0)
+        assemble_vector(F, self.L)
+        apply_lifting(F, [self.a], bcs=[[self.bc]], x0=[x], scale=-1.0)
+        F.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        set_bc(F, [self.bc], x, -1)
+
+    def J(self, snes, x, J, P):
+        """Assemble Jacobian matrix."""
+        J.zeroEntries()
+        assemble_matrix(J, self.a, bcs=[self.bc])
+        J.assemble()
