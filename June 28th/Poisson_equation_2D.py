@@ -62,7 +62,7 @@ plotter.view_xy()
 #    plotter.show()
 #else:
 #    figure = plotter.screenshot("fundamentals_mesh.png")
- plotter.show()
+plotter.show()
 
 u_topology, u_cell_types, u_geometry = plot.vtk_mesh(V)
 u_grid = pyvista.UnstructuredGrid(u_topology, u_cell_types, u_geometry)
