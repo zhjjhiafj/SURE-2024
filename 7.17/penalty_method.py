@@ -1,4 +1,4 @@
-#fixed point iteration with b=1-x^2
+#penalty method that ensures the solution to be non-negative
 import ufl
 import numpy
 import matplotlib.pyplot as plt
@@ -64,9 +64,9 @@ while error > tolerance and iteration < max_iterations:
     # , ufl.grad(uh2)
     #                - (2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * ufl.grad(b)), (n - 1.0) / 2.0)
     k = ufl.div(a*Phi)
-    penalty=uh2-(ufl.dot(uh2,uh2))**1/2*C
+    penalty=uh2-(ufl.dot(uh2,uh2))**0.5*C
     #F = (a*ufl.dot(ufl.grad(uh2), ufl.grad(v))+k*v-(f)*v)*ufl.dx
-    F = (a * ufl.dot(ufl.grad(uh2)-Phi, ufl.grad(v-uh2)) - (f-1/epsilon*penalty)* (v-uh2)) * ufl.dx
+    F = (a * ufl.dot(ufl.grad(uh2)-Phi, ufl.grad(v)) - (f-1/epsilon*penalty)* (v)) * ufl.dx
     #F = (a * ufl.dot(ufl.grad(uh2) - Phi, ufl.grad(v)) -f* v) * ufl.dx
     problem = NonlinearProblem(F, uh2, bcs=[bc])
     solver = NewtonSolver(MPI.COMM_WORLD, problem)
