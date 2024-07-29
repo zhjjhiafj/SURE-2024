@@ -46,15 +46,14 @@ b=1-x[0]**2
 uh.interpolate(lambda x: 2.0* (n + 2.0) ** (1.0 / n) * (1.0 - abs(x[0]) ** (1.0 + 1.0 / n)))
 while error > tolerance and iteration < max_iterations:
     uh2 = fem.Function(V)
-    uh2.interpolate(lambda x:1-x[0]**2)
+    uh2.interpolate(lambda x:1-3*x[0]**2)
     v = ufl.TestFunction(V)
     Phi = -(2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * (ufl.grad(b))
     a = (ufl.dot(ufl.grad(uh2) - Phi, ufl.grad(uh2) - Phi)) ** ((n - 1.0) / 2.0)
     # a = pow(ufl.dot(ufl.grad(uh2) - (2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * ufl.grad(b)\
     # , ufl.grad(uh2)
     #                - (2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * ufl.grad(b)), (n - 1.0) / 2.0)
-    k = ufl.div(a*Phi)
-    F = (a*ufl.dot(ufl.grad(uh2), ufl.grad(v))-k*v-f*v)*ufl.dx
+    F = (a*ufl.dot(ufl.grad(uh2)-Phi, ufl.grad(v))-f*v)*ufl.dx
 
     problem = NonlinearProblem(F, uh2, bcs=[bc])
     solver = NewtonSolver(MPI.COMM_WORLD, problem)
