@@ -48,7 +48,7 @@ u.interpolate(lambda x: 2.0* (n + 2.0) ** (1.0 / n) * (1.0 - abs(x[0]) ** (1.0 +
 alpha= ((n/(2.0*n+2.0))**n) / (n + 2.0)
 Phi = -(2 * n + 2.0) / n * pow(u, ((n + 2) / (2 * n + 2.0))) * (ufl.grad(b))
 
-f= ufl.conditional(ufl.le(x[0], 0.5), 1, -1)
+f= ufl.conditional(ufl.le(abs(x[0]), 0.5), 1, -1)
 #f=1.0
 functional = (alpha/(n+1)*(ufl.dot(ufl.grad(u)-Phi, ufl.grad(u)-Phi)**((n+1)/2.0))-f*u)*ufl.dx
 
