@@ -8,7 +8,7 @@ from dolfinx import mesh, fem, io, nls, log
 from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx.nls.petsc import NewtonSolver
 import numpy as np
-n=1.1
+n=3
 num_intervals = 1000
 start_point = -1.0
 end_point = 1.0
@@ -40,9 +40,9 @@ fdim = domain.topology.dim - 1
 boundary_facets = mesh.locate_entities_boundary(domain, fdim, lambda x: numpy.full(x.shape[1], True, dtype=bool))
 bc = fem.dirichletbc(u_D, fem.locate_dofs_topological(V, fdim, boundary_facets))
 
-error = float('inf')  # Use infinity as an initial error to ensure the loop starts
+error_L2 = float('inf')  # Use infinity as an initial error to ensure the loop starts
 tolerance = 1e-5  # Define a tolerance level
-max_iterations = 100 # Optional: to prevent infinite loops
+max_iterations = 10 # Optional: to prevent infinite loops
 iteration = 0
 uh = fem.Function(V)
 C=fem.Function(V)
@@ -50,13 +50,13 @@ constant_value = 1.0
 C.interpolate(lambda x: np.full_like(x[0], constant_value))
 #b=1-x[0]**2
 b=fem.Constant(domain, default_scalar_type(0.0))
-epsilon=0.001
+epsilon=0.00000001
 #b=1-x[0]**2
 
-uh.interpolate(lambda x:1-3*x[0]**2 )
-while error > tolerance and iteration < max_iterations:
+uh.interpolate(lambda x:1-2*x[0]**2 )
+while error_L2 > tolerance and iteration < max_iterations:
     uh2 = fem.Function(V)
-    uh2.interpolate(lambda x:1-3*x[0]**2)
+    uh2.interpolate(lambda x:1-x[0]**2)
     v = ufl.TestFunction(V)
     Phi = -(2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * (ufl.grad(b))
     a = (ufl.dot(ufl.grad(uh2) - Phi, ufl.grad(uh2) - Phi)) ** ((n - 1.0) / 2.0)
@@ -73,7 +73,7 @@ while error > tolerance and iteration < max_iterations:
     solver.convergence_criterion = "incremental"
     solver.rtol = 1e-5
     solver.report = True
-
+    solver.max_it=2000
     ksp = solver.krylov_solver
     opts = PETSc.Options()
     option_prefix = ksp.getOptionsPrefix()
@@ -115,10 +115,10 @@ if domain.comm.rank == 0:
      #        label="u(x)",
     #         linestyle='dashed')
     plt.xlabel("x")
-    plt.ylabel("u(x)")
+    plt.ylabel("u")
     plt.legend()
-    plt.title("Solution of the 1D Poisson equation")
+    plt.title("Penalty method a=1 (|x|<=0.5) a=-1 (0.5<|x|<=1)")
    # plt.savefig("/home/zhenyu/SURE2024/7.10/test1.png")
     plt.show()
 
-print(uh.x.array[500])
+print(uh.x.array[20])
