@@ -66,7 +66,7 @@ while error_L2 > tolerance and iteration < max_iterations:
     k = ufl.div(a*Phi)
     penalty=uh2-(ufl.dot(uh2,uh2))**0.5*C
     #F = (a*ufl.dot(ufl.grad(uh2), ufl.grad(v))+k*v-(f)*v)*ufl.dx
-    F = (a * ufl.dot(ufl.grad(uh2)-Phi, ufl.grad(v)) - (f-1/epsilon*penalty)* (v)) * ufl.dx
+    F = (a * ufl.dot(ufl.grad(uh2)-Phi, ufl.grad(v)) - (f)* (v)) * ufl.dx
     #F = (a * ufl.dot(ufl.grad(uh2) - Phi, ufl.grad(v)) -f* v) * ufl.dx
     problem = NonlinearProblem(F, uh2, bcs=[bc])
     solver = NewtonSolver(MPI.COMM_WORLD, problem)
@@ -102,6 +102,10 @@ V_ex = fem.functionspace(domain, ("Lagrange", 2))
 u_ex = fem.Function(V_ex)
 # u_ex.interpolate(u_exact)
 #u_values = uh.x.array**(n/(2*n+2.0))
+f1=fem.Expression(f,V.element.interpolation_points())
+f2=fem.Function(V)
+f2.interpolate(f1)
+u_values2=f2.x.array
 u_values = uh.x.array
 #u_values = abs(uh.x.array)**(n/(2*n+2.0))
 x_values = np.linspace(start_point, end_point, num_intervals + 1)
@@ -111,14 +115,15 @@ if domain.comm.rank == 0:
     plt.figure()
     plt.grid()
     plt.plot(x_values, u_values, label="Numerical solution")
+    #plt.plot(x_values, u_values2, label="f")
     #plt.plot(x_values, 1-x_values**2,
      #        label="u(x)",
     #         linestyle='dashed')
     plt.xlabel("x")
     plt.ylabel("u")
     plt.legend()
-    plt.title("Penalty method a=1 (|x|<=0.5) a=-1 (0.5<|x|<=1)")
-   # plt.savefig("/home/zhenyu/SURE2024/7.10/test1.png")
+    plt.title("Penalty method a=1 (|x|<=0.5) a=-3 (0.5<|x|<=1)")
+   # plt.savefig("/home/zhenyu/SURE2024/plt.plot(x_values, u_values, label="Numerical solution")7.10/test1.png")
     plt.show()
 
 print(uh.x.array[20])
