@@ -35,7 +35,7 @@ boundary_facets = mesh.locate_entities_boundary(domain, fdim, lambda x: numpy.fu
 bc = fem.dirichletbc(u_D, fem.locate_dofs_topological(V, fdim, boundary_facets))
 
 error = float('inf')  # Use infinity as an initial error to ensure the loop starts
-tolerance = 1e-5  # Define a tolerance level
+tolerance = 1e-10  # Define a tolerance level
 max_iterations = 100 # Optional: to prevent infinite loops
 iteration = 0
 uh = fem.Function(V)
@@ -60,7 +60,7 @@ while error > tolerance and iteration < max_iterations:
     problem = NonlinearProblem(F, uh2, bcs=[bc])
     solver = NewtonSolver(MPI.COMM_WORLD, problem)
     solver.convergence_criterion = "incremental"
-    solver.rtol = 1e-5
+    solver.rtol = 1e-10
     solver.report = True
 
     ksp = solver.krylov_solver
@@ -89,11 +89,13 @@ while error > tolerance and iteration < max_iterations:
 
 # Compute L2 error and error at nodes
 V_ex = fem.functionspace(domain, ("Lagrange", 2))
-u_ex = fem.Function(V_ex)
-# u_ex.interpolate(u_exact)
-u_values = uh.x.array**(n/(2*n+2.0))
+u_ex =(2 * (n + 2) ** (1.0 / n) * (1 - abs(x[0]) ** (1.0 + 1.0 / n))) ** (n / (2 * n + 2.0))
 x_values = np.linspace(start_point, end_point, num_intervals + 1)
-
+u_values = uh.x.array**(n/(2*n+2.0))
+un=uh**((n/(2*n+2.0)))
+L2_error = fem.form(ufl.inner(un - u_ex, un - u_ex) * ufl.dx)
+error_local = fem.assemble_scalar(L2_error)
+error_L2 = numpy.sqrt(domain.comm.allreduce(error_local, op=MPI.SUM))
 if domain.comm.rank == 0:
     plt.show()
     plt.figure()
@@ -103,8 +105,10 @@ if domain.comm.rank == 0:
              label="Exact solution",
              linestyle='dashed')
     plt.xlabel("x")
-    plt.ylabel("u(x)")
+    plt.ylabel("h")
     plt.legend()
-    plt.title("Solution of the 1D Poisson equation")
+    plt.title("Fixed Point Method for Reformed Problem (n=3)")
    # plt.savefig("/home/zhenyu/SURE2024/7.10/test1.png")
     plt.show()
+
+print(error_L2)
