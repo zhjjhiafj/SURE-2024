@@ -1,4 +1,4 @@
-#penalty method for rectangle mesh
+#L2 error of using snes solver and using penalty method for solving VI
 import dolfinx
 from dolfinx.fem.petsc import create_matrix
 from dolfinx.la import create_petsc_vector
