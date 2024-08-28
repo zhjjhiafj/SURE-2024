@@ -8,7 +8,7 @@ from dolfinx.nls.petsc import NewtonSolver
 from petsc4py import PETSc
 n=1
 def q(u):
-    return (1.0/(n+2))*u**(n+2)*((ufl.dot(ufl.grad(u), ufl.grad(u)))**2)**((n-1)/2.0)
+    return (1.0/(n+2))*u**(n+2)*(ufl.dot(ufl.grad(u), ufl.grad(u)))**((n-1)/2)
 
 
 
@@ -21,7 +21,8 @@ x = ufl.SpatialCoordinate(domain)
 V = fem.functionspace(domain, ("Lagrange", 1))
 #def u_exact(x): return eval(str(u_ufl))
 u_exact = fem.Function(V)
-u_exact.interpolate(lambda x: 6**(1.0/(4.0))*(1-((x[0]**2)**0.5)**2)**(1.0/(4.0)))
+u_exact.interpolate(lambda x: ((2.0 ** n * (n + 2.0)) ** (1.0 / (2.0 * n + 2.0))) * (
+                1.0 - ((x[0] ** 2) ** 0.5) ** (1.0 + 1.0 / n)) ** (n * 1.0 / (2.0 * n + 2.0)))
 #u_exact.interpolate(lambda x: -x[0]^2**0.25+1)
 
 from dolfinx import default_scalar_type
@@ -36,7 +37,7 @@ bc = fem.dirichletbc(u_D, fem.locate_dofs_topological(V, fdim, boundary_facets))
 
 uh = fem.Function(V)
 #uh.interpolate(u_exact)
-uh.interpolate(lambda x:1-x[0]**2)
+uh.interpolate(lambda x:(1-x[0]**2)*1.5)
 v = ufl.TestFunction(V)
 F = q(uh) * ufl.dot(ufl.grad(uh), ufl.grad(v)) * ufl.dx - f * v * ufl.dx
 
@@ -44,7 +45,7 @@ problem = NonlinearProblem(F, uh, bcs=[bc])
 
 solver = NewtonSolver(MPI.COMM_WORLD, problem)
 solver.convergence_criterion = "incremental"
-solver.rtol = 1e-6
+solver.rtol = 1e-8
 solver.report = True
 
 ksp = solver.krylov_solver
@@ -56,12 +57,12 @@ opts[f"{option_prefix}pc_factor_mat_solver_type"] = "mumps"
 ksp.setFromOptions()
 
 log.set_log_level(log.LogLevel.INFO)
-n, converged = solver.solve(uh)
+k, converged = solver.solve(uh)
 assert (converged)
-print(f"Number of interations: {n:d}")
+print(f"Number of interations: {k:d}")
 
 # Compute L2 error and error at nodes
-V_ex = fem.functionspace(domain, ("Lagrange", 2))
+V_ex = fem.functionspace(domain, ("Lagrange", 1))
 u_ex = fem.Function(V_ex)
 u_ex.interpolate(u_exact)
 error_local = fem.assemble_scalar(fem.form((uh - u_ex)**2 * ufl.dx))
@@ -70,7 +71,7 @@ if domain.comm.rank == 0:
     print(f"L2-error: {error_L2:.2e}")
 
 # Compute values at mesh vertices
-error_max = domain.comm.allreduce(numpy.max(numpy.abs(uh.x.array - u_D.x.array)), op=MPI.MAX)
+error_max = domain.comm.allreduce(numpy.max(numpy.abs(uh.x.array - u_ex.x.array)), op=MPI.MAX)
 if domain.comm.rank == 0:
     print(f"Error_max: {error_max:.2e}")
 
@@ -80,8 +81,9 @@ x_values = np.linspace(start_point, end_point, num_intervals + 1)
 
 if domain.comm.rank == 0:
     plt.figure()
-    plt.plot(x_values, u_values, label="Numerical solution")
-    plt.plot(x_values, (2 * (n + 2) ** (1.0 / n) * (1 - abs(x_values) ** (1.0 + 1.0 / n))) ** (n / (2 * n + 2.0)),
+    plt.plot(x_values, uh.x.array, label="Numerical solution")
+    plt.plot(x_values, ((2.0 ** n * (n + 2.0)) ** (1.0 / (2.0 * n + 2.0))) * (
+                1.0 - ((x_values ** 2) ** 0.5) ** (1.0 + 1.0 / n)) ** (n * 1.0 / (2.0 * n + 2.0)),
              label="Exact solution",
              linestyle='dashed')
     plt.xlabel("x")
