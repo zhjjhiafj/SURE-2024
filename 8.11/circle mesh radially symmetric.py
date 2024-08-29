@@ -1,3 +1,35 @@
+import pyvista
+from mpi4py import MPI
+import ufl
+import dolfinx
+import math
+import numpy
+import matplotlib.pyplot as plt
+from mpi4py import MPI
+from petsc4py import PETSc
+from dolfinx import mesh, fem, io, nls, log
+from dolfinx.fem.petsc import NonlinearProblem
+from dolfinx.nls.petsc import NewtonSolver
+import numpy as np
+from dolfinx.io import XDMFFile, gmshio
+import gmsh
+# Initialize gmsh
+gmsh.initialize()
+
+# Create a new model named "filled_ring"
+gmsh.model.add("filled_ring")
+
+# Parameters
+outer_radius = 1.0
+inner_radius = 0.75
+L=outer_radius
+R=inner_radius
+size=0.08
+# Adjust mesh sizes for the points
+outer_mesh_size = size  # Smaller value -> finer mesh
+inner_mesh_size = size
+
+import gmsh
 #test for penalty method
 
 import ufl
@@ -25,8 +57,8 @@ gmsh.model.occ.synchronize()
 gdim = 2
 gmsh.model.addPhysicalGroup(gdim, [disk], 1)
 
-gmsh.option.setNumber("Mesh.CharacteristicLengthMin", 0.15)
-gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 0.15)
+gmsh.option.setNumber("Mesh.CharacteristicLengthMin", 0.05)
+gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 0.01)
 gmsh.model.mesh.generate(gdim)
 gmsh_model_rank = 0
 mesh_comm = MPI.COMM_WORLD
@@ -71,14 +103,14 @@ alpha_plus=(-((n/(2.0*n+2.0))**n) / (n + 2.0)*
 alpha2=fem.Function(V)
 alpha3=fem.Expression(alpha_plus,V.element.interpolation_points())
 alpha2.interpolate(alpha3)
-alpha=ufl.conditional(ufl.sqrt(x[0]**2+x[1]**2) < R, alpha_plus, -1)
+alpha=ufl.conditional(ufl.sqrt(x[0]**2+x[1]**2) < R, alpha_plus, 0)
 alpha5=fem.Expression(alpha,V.element.interpolation_points())
 alpha4=fem.Function(V)
 alpha4.interpolate(alpha5)
 #alpha=ufl.conditional(abs(x[0]) < R, alpha_plus, 0)
 error = float('inf')  # Use infinity as an initial error to ensure the loop starts
 tolerance = 1e-9# Define a tolerance level
-max_iterations = 20 # Optional: to prevent infinite loops
+max_iterations = 0 # Optional: to prevent infinite loops
 iteration = 0
 array= np.arange(max_iterations*1.0)
 uh = fem.Function(V)
@@ -145,6 +177,10 @@ with dolfinx.io.XDMFFile(MPI.COMM_WORLD, "output/u.xdmf", "w") as f:
 topology, cell_types,geometry= dolfinx.plot.vtk_mesh(domain, domain.topology.dim)
 import pyvista
 grid = pyvista.UnstructuredGrid(topology, cell_types, geometry)
+u2=fem.Expression(u,V.element.interpolation_points())
+u3=fem.Function(V)
+u3.interpolate(u2)
+#grid.point_data["alpha"] = uh.x.array.real-u3.x.array.real
 grid.point_data["alpha"] = alpha4.x.array.real
 grid.set_active_scalars("alpha")
 pyvista.OFF_SCREEN=False
