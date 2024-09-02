@@ -1,0 +1,140 @@
+#test for penalty method
+
+import ufl
+import dolfinx
+import math
+import numpy
+import matplotlib.pyplot as plt
+from mpi4py import MPI
+from petsc4py import PETSc
+from dolfinx import mesh, fem, io, nls, log
+from dolfinx.fem.petsc import NonlinearProblem
+from dolfinx.nls.petsc import NewtonSolver
+import numpy as np
+def find_err(num_intervals):
+        n=2
+        L=1.0
+        R=0.75
+        start_point = -L
+        end_point = L
+        domain = mesh.create_interval(MPI.COMM_WORLD, num_intervals, [start_point, end_point])
+        x = ufl.SpatialCoordinate(domain)
+        V = fem.functionspace(domain, ("Lagrange", 1))
+
+        b_0 = 0.01
+        z_0 = 1.2
+
+
+        # Define the expression for b(x)
+        #b=1-x[0]**2
+        b = b_0 * ufl.cos(z_0 * ufl.pi * abs(x[0]) / R)
+        from dolfinx import default_scalar_type
+        #b=fem.Constant(domain, default_scalar_type(0.0))
+        u_0 = 1.0 - n /(n-1.0) * (
+            (abs(x[0])/ R)**((n + 1.0) / (n ))
+            - (1.0 - abs(x[0])/ R)**((n + 1.0) / (n ))
+            + 1
+            - (n + 1.0) / (n ) * (abs(x[0]) / R)
+        )
+        u=ufl.conditional(abs(x[0]) < R, u_0, 0)
+        h=u**(n/(2*n+2.0))
+        H=h + b
+        from dolfinx import default_scalar_type
+        #q_plus=- ( 1/ (n + 2.0)) *H**(n + 2.0) * ufl.sqrt(ufl.dot(ufl.grad(h), ufl.grad(h)))\
+        #                            **(n - 1.0) * ufl.grad(h)
+        #q=ufl.conditional(abs(x[0]) < R, q_plus, ufl.as_vector([0.0] * len(q_plus)))
+        #f=ufl.div(q)
+        u_D = fem.Function(V)
+        u_D.interpolate(lambda x: np.zeros_like(x[0]))
+        fdim = domain.topology.dim - 1
+        boundary_facets = mesh.locate_entities_boundary(domain, fdim, lambda x: numpy.full(x.shape[1], True, dtype=bool))
+        bc = fem.dirichletbc(u_D, fem.locate_dofs_topological(V, fdim, boundary_facets))
+        Phi_ufl = -(2 * n + 2.0) / n * pow(u, ((n + 2) / (2 * n + 2.0))) * (ufl.grad(b))
+        alpha_plus=(-((n/(2.0*n+2.0))**n) / (n + 2.0)*
+               ufl.div((ufl.dot(ufl.grad(u) - Phi_ufl, ufl.grad(u) - Phi_ufl)) ** ((n - 1.0) / 2.0)\
+                   * (ufl.grad(u) - Phi_ufl)))
+        alpha2=fem.Function(V)
+        alpha3=fem.Expression(alpha_plus,V.element.interpolation_points())
+        alpha2.interpolate(alpha3)
+        alpha=ufl.conditional(abs(x[0]) < R, alpha_plus, alpha2.x.array[math.ceil(((L-R)/L/2.0)*num_intervals)+1])
+        #alpha=ufl.conditional(abs(x[0]) < R, alpha_plus, 0)
+        error = float('inf')  # Use infinity as an initial error to ensure the loop starts
+        tolerance = 1e-18# Define a tolerance level
+        max_iterations = 10 # Optional: to prevent infinite loops
+        iteration = 0
+        array= np.arange(max_iterations*1.0)
+        uh = fem.Function(V)
+        u2=fem.Expression(u,V.element.interpolation_points())
+        uh.interpolate(lambda x:(1-x[0]**2)*0.8)
+        C=fem.Function(V)
+        constant_value = 1.0
+        C.interpolate(lambda x: np.full_like(x[0], constant_value))
+        epsilon=0.0000000000001
+        while iteration < max_iterations and error > tolerance:
+            uh2 = fem.Function(V)
+            uh2.interpolate(lambda x:(1-x[0]**2)*0.8)
+            #uh2.interpolate(uh)
+            v = ufl.TestFunction(V)
+            Phi = -(2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * (ufl.grad(b))
+            a = ((n/(2.0*n+2.0))**n) / (n + 2.0)*(ufl.dot(ufl.grad(uh2) - Phi, ufl.grad(uh2) - Phi)) ** ((n - 1.0) / 2.0)
+            # a = pow(ufl.dot(ufl.grad(uh2) - (2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * ufl.grad(b)\
+            # , ufl.grad(uh2)
+            #                - (2 * n + 2.0) / n * pow(uh, ((n + 2) / (2 * n + 2.0))) * ufl.grad(b)), (n - 1.0) / 2.0)
+            penalty = uh2 - (ufl.dot(uh2, uh2)) ** 0.5 * C
+
+            F = (a*ufl.dot(ufl.grad(uh2)-Phi, ufl.grad(v))-(alpha-1/epsilon*penalty)*v)*ufl.dx
+
+            problem = NonlinearProblem(F, uh2, bcs=[bc])
+            solver = NewtonSolver(MPI.COMM_WORLD, problem)
+            solver.convergence_criterion = "residual"
+            solver.rtol = 1e-8
+            solver.atol=1e-8
+            ksp = solver.krylov_solver
+            log.set_log_level(log.LogLevel.INFO)
+            opts = PETSc.Options()
+            option_prefix = ksp.getOptionsPrefix()
+            opts[f"{option_prefix}ksp_type"] = "cg"
+            #opts[f"{option_prefix}pc_type"] = "ilu"
+            solver.max_it = 2000
+
+            opts[f"{option_prefix}pc_type"] = "lu"
+            opts[f"{option_prefix}pc_factor_mat_solver_type"] = "mumps"
+            ksp.setFromOptions()
+
+            log.set_log_level(log.LogLevel.INFO)
+            m, converged = solver.solve(uh2)
+            assert (converged)
+            print(f"Number of interations: {m:d}")
+
+            L2_error = fem.form(ufl.inner(uh - uh2, uh - uh2) * ufl.dx)
+            error_local = fem.assemble_scalar(L2_error)
+            error_L2 = numpy.sqrt(domain.comm.allreduce(error_local, op=MPI.SUM))
+            error=error_L2
+            print(f"Iteration: {iteration}, Error: {error_L2}")
+            array[iteration] = np.log10(error_L2)
+            uh3 = ufl.conditional(ufl.ge(uh2, 0), uh2, 1 / 10 ** 18)
+            uh4 = fem.Expression(uh3, V.element.interpolation_points())
+            uh.interpolate(uh4)
+            # Increment the iteration counter
+            iteration=iteration+1
+        u2 = fem.Expression(u, V.element.interpolation_points())
+        u3 = fem.Function(V)
+        u3.interpolate(u2)
+        L2_error2 = fem.form(ufl.inner(uh - u3, uh - u3) * ufl.dx)
+        error_local2 = fem.assemble_scalar(L2_error2)
+        err = numpy.log(numpy.sqrt(domain.comm.allreduce(error_local2, op=MPI.SUM)))
+        error_max = numpy.log(
+            domain.comm.allreduce(np.max(-(uh.x.array)  +u3.x.array), op=MPI.MAX))
+        print(err)
+        print(error_max)
+        indices = np.arange(1, max_iterations + 1)
+        print(array)
+        # Plot the non-zero values
+        plt.plot(indices, array)
+        plt.title("Error Diagram of Fixed Point Iteration for Constructed Problem")
+        plt.xlabel("Number of Iterations")
+        plt.ylabel("log10(error)")
+        plt.xticks(np.arange(1, max_iterations + 1, 1))
+        plt.show()
+        return
+find_err(2000)
