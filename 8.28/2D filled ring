@@ -48,9 +48,9 @@ gmsh.model.geo.addCircleArc(9, 5, 6, 8)
 outer_loop = gmsh.model.geo.addCurveLoop([1, 2, 3, 4])
 inner_loop = gmsh.model.geo.addCurveLoop([5, 6, 7, 8])
 
-# Create plane surfaces for both loops
-outer_surface = gmsh.model.geo.addPlaneSurface([outer_loop])
+# Create plane surfaces for the inner disk and the ring
 inner_surface = gmsh.model.geo.addPlaneSurface([inner_loop])
+outer_surface = gmsh.model.geo.addPlaneSurface([outer_loop, inner_loop])
 
 # Synchronize the model
 gmsh.model.geo.synchronize()
@@ -58,7 +58,11 @@ gmsh.model.geo.synchronize()
 # Assign physical groups to the curves and surfaces
 gmsh.model.addPhysicalGroup(1, [1, 2, 3, 4], 1)  # Outer boundary
 gmsh.model.addPhysicalGroup(1, [5, 6, 7, 8], 2)  # Inner boundary
-gmsh.model.addPhysicalGroup(2, [outer_surface, inner_surface], 3)  # Both surfaces
+gmsh.model.addPhysicalGroup(2, [outer_surface], 3)  # Outer ring surface
+gmsh.model.addPhysicalGroup(2, [inner_surface], 4)  # Inner disk surface
+
+# Synchronize the model again after adding physical groups
+gmsh.model.geo.synchronize()
 
 # Generate the mesh
 gmsh.model.mesh.generate(2)
@@ -71,12 +75,3 @@ domain, cell_markers, facet_markers = gmshio.model_to_mesh(
 
 # Finalize the gmsh session
 gmsh.finalize()
-
-# Visualize the mesh using PyVista
-topology, cell_types, geometry = dolfinx.plot.vtk_mesh(domain, domain.topology.dim)
-grid = pyvista.UnstructuredGrid(topology, cell_types, geometry)
-pyvista.OFF_SCREEN = False
-plotter = pyvista.Plotter()
-plotter.add_mesh(grid, show_edges=True, show_scalar_bar=False)
-plotter.view_xy()
-plotter.show()
